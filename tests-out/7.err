@@ -1,1 +1,1 @@
-./tester/run-tests.sh: line 27: 32138 Segmentation fault      ./reverse < tests/7.in
+Error al obtener información del archivo de entrada: Bad address

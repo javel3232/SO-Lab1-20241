@@ -84,6 +84,8 @@ struct stat stat_in, stat_out;
             exit(1);
         }
         new_node->line = strdup(line); // strdup() duplica la cadena
+        new_node->next = head;
+        head = new_node;
         if (new_node->line == NULL) {
             fprintf(stderr, "malloc failed\n");
             exit(1);
