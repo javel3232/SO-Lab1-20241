@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #define MAX_LINE_LENGTH 1024
 
@@ -49,6 +51,27 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // Comprobación de hardlink
+struct stat stat_in, stat_out;
+
+    // Obtener información del archivo de entrada
+    if (stat(argv[1], &stat_in) == -1) {
+        perror("Error al obtener información del archivo de entrada");
+        return 1;
+    }
+
+    // Obtener información del archivo de salida
+    if (stat(argv[2], &stat_out) == -1) {
+        perror("Error al obtener información del archivo de salida");
+        return 1;
+    }
+
+    // Comparar números de dispositivo e inodo
+    if (stat_in.st_dev == stat_out.st_dev && stat_in.st_ino == stat_out.st_ino) {
+        fprintf(stderr, "reverse: input and output file must differ\n");        
+        exit(1);
+    }
+
     // Lectura del archivo de entrada y almacenamiento en una lista enlazada
     char *line = NULL;
     size_t line_length = 0;
@@ -61,8 +84,10 @@ int main(int argc, char *argv[]) {
             exit(1);
         }
         new_node->line = strdup(line); // strdup() duplica la cadena
-        new_node->next = head;
-        head = new_node;
+        if (new_node->line == NULL) {
+            fprintf(stderr, "malloc failed\n");
+            exit(1);
+        }
     }
     free(line);
     line = NULL;
