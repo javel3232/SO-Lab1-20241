@@ -4,66 +4,35 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#define MAX_LINE_LENGTH 1024
+#define MAX_LINE_LENGTH 1000
 
-// Estructura para almacenar cada línea
-typedef struct Node {
-    char *line;
-    struct Node *next;
-} Node;
-
-// Función para imprimir el uso correcto
-void print_usage() {
+void tooManyArguments() {
     fprintf(stderr, "usage: reverse <input> <output>\n");
+    exit(1);
 }
 
-int main(int argc, char *argv[]) {
-    // Verificación de argumentos
-    if (argc > 3) {
-        print_usage();
+void openFile(char *file_name, FILE **file) {
+    *file = fopen(file_name, "r");
+    // Input file does not exist (Test 2) and Cannot open file (Test 3)
+    if (*file == NULL) {
+        fprintf(stderr, "reverse: cannot open file '%s'\n", file_name);
         exit(1);
     }
+}
 
-    // Variables para archivos de entrada y salida
-    FILE *input_file = NULL;
-    FILE *output_file = NULL;
-
-    // Apertura de archivos de entrada y salida
-    if (argc >= 2) {
-        input_file = fopen(argv[1], "r");
-        if (input_file == NULL) {
-            fprintf(stderr, "reverse: cannot open file '%s'\n", argv[1]);
-            exit(1);
-        }
-    }
-
-    if (argc == 3) {
-        output_file = fopen(argv[2], "w");
-        if (output_file == NULL) {
-            fprintf(stderr, "reverse: cannot open file '%s'\n", argv[2]);
-            exit(1);
-        }
-
-        // Verifica si el archivo de entrada y salida son iguales
-        if (strcmp(argv[1], argv[2]) == 0) {
-            fprintf(stderr, "reverse: input and output file must differ\n");
-            exit(1);
-        }
-    }
-
-    // Comprobación de hardlink
-struct stat stat_in, stat_out;
+void hardlinkTest(char *argv[]) {
+    struct stat stat_in, stat_out;
 
     // Obtener información del archivo de entrada
     if (stat(argv[1], &stat_in) == -1) {
-        perror("Error al obtener información del archivo de entrada");
-        return 1;
+        fprintf(stderr, "Error trying to get inputfile info'\n");
+        exit(1);
     }
 
     // Obtener información del archivo de salida
     if (stat(argv[2], &stat_out) == -1) {
-        perror("Error al obtener información del archivo de salida");
-        return 1;
+        fprintf(stderr, "Error trying to get outputfile info'\n");
+        exit(1);
     }
 
     // Comparar números de dispositivo e inodo
@@ -71,49 +40,94 @@ struct stat stat_in, stat_out;
         fprintf(stderr, "reverse: input and output file must differ\n");        
         exit(1);
     }
+}
 
-    // Lectura del archivo de entrada y almacenamiento en una lista enlazada
-    char *line = NULL;
-    size_t line_length = 0;
-    Node *head = NULL;
-
-    while (getline(&line, &line_length, input_file) != -1) {
-        Node *new_node = (Node *)malloc(sizeof(Node));
-        if (new_node == NULL) {
-            fprintf(stderr, "malloc failed\n");
-            exit(1);
-        }
-        new_node->line = strdup(line); // strdup() duplica la cadena
-        new_node->next = head;
-        head = new_node;
-        if (new_node->line == NULL) {
-            fprintf(stderr, "malloc failed\n");
-            exit(1);
-        }
+void reverseLines(char lines[][MAX_LINE_LENGTH], int numLines) {
+    // Print lines in reverse order
+    for (int i = numLines - 1; i >= 0; i--) {
+        printf("%s", lines[i]);
     }
-    free(line);
-    line = NULL;
+}
+ 
+void readLinesFromConsoleAndPrint() {
+    char lines[MAX_LINE_LENGTH][MAX_LINE_LENGTH];
+    int numLines = 0;
 
-    // Impresión de las líneas en orden inverso
-    Node *current = head;
-    while (current != NULL) {
-        if (output_file != NULL) {
-            fprintf(output_file, "%s", current->line);
-        } else {
-            printf("%s", current->line);
-        }
-        Node *temp = current;
-        current = current->next;
-        free(temp->line); // Liberar la memoria asignada a la línea
-        free(temp); // Liberar la memoria asignada al nodo
+    // Read lines from stdin
+    while (fgets(lines[numLines], MAX_LINE_LENGTH, stdin) != NULL) {
+        numLines++;
     }
 
-    // Cierre de archivos
-    if (input_file != NULL) {
-        fclose(input_file);
+    // Reverse and print lines
+    reverseLines(lines, numLines);
+}
+
+void readLinesFromFileAndPrint(FILE **file) {
+
+    char lines[MAX_LINE_LENGTH][MAX_LINE_LENGTH];
+    int numLines = 0;
+
+    // Read lines from file
+    while (fgets(lines[numLines], MAX_LINE_LENGTH, *file) != NULL) {
+        numLines++;
     }
-    if (output_file != NULL) {
-        fclose(output_file);
+
+    // Reverse and print lines
+    reverseLines(lines, numLines);
+
+    fclose(*file);
+}
+
+void reverseFileAndWrite(FILE **inputFile, FILE **outputFile) {
+    
+    char lines[MAX_LINE_LENGTH][MAX_LINE_LENGTH];
+    int numLines = 0;
+
+    // Read lines from input file
+    while (fgets(lines[numLines], MAX_LINE_LENGTH, *inputFile) != NULL) {
+        numLines++;
+    }
+
+    // Write lines to output file in reverse order
+    for (int i = numLines - 1; i >= 0; i--) {
+        fputs(lines[i], *outputFile);
+    }
+
+    fclose(*inputFile);
+    fclose(*outputFile);
+
+}
+
+int main(int argc, char *argv[]) {
+    FILE *input_file = NULL;
+    FILE *output_file = NULL;
+
+    switch (argc) {
+        case 1:
+            readLinesFromConsoleAndPrint();
+            break;
+        case 2:
+            openFile(argv[1], &input_file);
+            readLinesFromFileAndPrint(&input_file);
+            break;
+        case 3:
+            // Input has the same name as output (Test 4)
+            if (strcmp(argv[1], argv[2]) == 0) {
+                fprintf(stderr, "reverse: input and output file must differ\n");
+                exit(1);
+            } else {
+                openFile(argv[1], &input_file);
+                openFile(argv[2], &output_file);
+
+                // Input and output are actually the same file (hardlinked) (Test 5)
+                hardlinkTest(argv);
+
+                reverseFileAndWrite(&input_file, &output_file);
+            }
+            break;
+        default:
+            // Too many command-line arguments (Test 1)
+            tooManyArguments();            
     }
 
     return 0;
